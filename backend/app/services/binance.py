@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+import json
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlencode
 from urllib.request import urlopen
-import json
 
 BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
 MAX_KLINES_PER_REQUEST = 1000
@@ -27,14 +27,23 @@ INTERVAL_TO_MS = {
 }
 
 
-def fetch_klines(symbol: str, interval: str, start_date: date, end_date: date) -> list[dict[str, object]]:
+def fetch_klines(
+    symbol: str,
+    interval: str,
+    start_date: date,
+    end_date: date,
+) -> list[dict[str, object]]:
     if interval not in INTERVAL_TO_MS:
         raise ValueError(f"Unsupported interval '{interval}'.")
     if end_date < start_date:
         raise ValueError("end_date must be greater than or equal to start_date.")
 
-    start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
-    end_dt_exclusive = datetime.combine(end_date + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
+    end_dt_exclusive = datetime.combine(
+        end_date + timedelta(days=1),
+        datetime.min.time(),
+        tzinfo=UTC,
+    )
     start_ms = int(start_dt.timestamp() * 1000)
     end_ms_exclusive = int(end_dt_exclusive.timestamp() * 1000)
     step_ms = INTERVAL_TO_MS[interval]

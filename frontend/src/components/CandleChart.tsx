@@ -72,15 +72,13 @@ export function CandleChart({
 
   const ohlcData = useMemo(
     () =>
-      candles.map(
-        (candle): CandlestickData<Time> & BarData<Time> => ({
-          time: toChartTime(candle.timestamp ?? candle.date),
-          open: candle.open,
-          high: candle.high,
-          low: candle.low,
-          close: candle.close,
-        }),
-      ),
+      candles.map((candle): CandlestickData<Time> & BarData<Time> => ({
+        time: toChartTime(candle.timestamp ?? candle.date),
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      })),
     [candles],
   );
 

@@ -1,8 +1,8 @@
 from io import BytesIO
 from pathlib import Path
 
-from fastapi import UploadFile
 import pandas as pd
+from fastapi import UploadFile
 from pydantic import ValidationError
 
 from app.models import Candle

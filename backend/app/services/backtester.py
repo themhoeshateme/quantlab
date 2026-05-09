@@ -161,7 +161,7 @@ def calculate_sharpe_ratio(equity_values: list[float]) -> float:
         return 0.0
     returns = [
         (current - previous) / previous
-        for previous, current in zip(equity_values, equity_values[1:])
+        for previous, current in zip(equity_values, equity_values[1:], strict=False)
         if previous != 0
     ]
     if len(returns) < 2:

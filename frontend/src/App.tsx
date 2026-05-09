@@ -129,6 +129,8 @@ function App() {
   useEffect(() => {
     checkHealth();
     loadLiveBinanceData();
+    // Run the boot load once with the default Binance range.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -794,7 +796,9 @@ function App() {
           />
           <Metric
             label="Sharpe ratio"
-            value={formatCompact(apiBacktest?.stats?.sharpe_ratio ?? apiBacktest?.summary.sharpe_ratio ?? 0)}
+            value={formatCompact(
+              apiBacktest?.stats?.sharpe_ratio ?? apiBacktest?.summary.sharpe_ratio ?? 0,
+            )}
             tone="muted-strong"
           />
         </section>
@@ -1085,9 +1089,7 @@ function readBands(value: unknown): Array<BollingerBandPoint | null> {
 function filterCandlesByDateRange(candles: Candle[], startDate: string, endDate: string): Candle[] {
   if (!startDate && !endDate) return candles;
   const start = startDate ? Date.parse(startDate) : Number.NEGATIVE_INFINITY;
-  const end = endDate
-    ? Date.parse(`${endDate}T23:59:59.999Z`)
-    : Number.POSITIVE_INFINITY;
+  const end = endDate ? Date.parse(`${endDate}T23:59:59.999Z`) : Number.POSITIVE_INFINITY;
   return candles.filter((candle) => {
     const candleTime = Date.parse(candle.timestamp ?? candle.date);
     if (Number.isNaN(candleTime)) return false;

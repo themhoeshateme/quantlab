@@ -3,6 +3,34 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 
+vi.mock('lightweight-charts', () => {
+  const series = {
+    setData: vi.fn(),
+    applyOptions: vi.fn(),
+    priceScale: () => ({ applyOptions: vi.fn() }),
+  };
+  return {
+    BarSeries: 'BarSeries',
+    CandlestickSeries: 'CandlestickSeries',
+    ColorType: { Solid: 'solid' },
+    HistogramSeries: 'HistogramSeries',
+    LineSeries: 'LineSeries',
+    LineStyle: { Dashed: 1 },
+    createSeriesMarkers: () => ({ setMarkers: vi.fn() }),
+    createChart: () => ({
+      addSeries: () => series,
+      applyOptions: vi.fn(),
+      remove: vi.fn(),
+      subscribeCrosshairMove: vi.fn(),
+      timeScale: () => ({
+        fitContent: vi.fn(),
+        getVisibleLogicalRange: vi.fn(() => ({ from: 0, to: 10 })),
+        setVisibleLogicalRange: vi.fn(),
+      }),
+    }),
+  };
+});
+
 const candles = Array.from({ length: 14 }, (_, index) => ({
   timestamp: `2024-01-${String(index + 1).padStart(2, '0')}`,
   open: 100 + index,
@@ -48,10 +76,8 @@ describe('App', () => {
     invalidUpload = false;
     vi.restoreAllMocks();
     vi.stubGlobal('fetch', vi.fn(mockFetch));
-    vi.stubGlobal('URL', {
-      createObjectURL: vi.fn(() => 'blob:quantlab'),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:quantlab');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
   });
 
   it('renders the QuantLab dashboard', async () => {
@@ -83,9 +109,9 @@ describe('App', () => {
     const file = new File(['timestamp,open,close\n2024-01-01,10,11'], 'bad.csv', {
       type: 'text/csv',
     });
-    await user.upload(await screen.findByLabelText('Upload OHLCV CSV'), file);
+    await user.upload(await screen.findByLabelText('Upload OHLCV file'), file);
 
-    expect(await screen.findByText(/CSV is missing required columns/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Missing required columns/i)).toBeInTheDocument();
   });
 
   it('disables Run Backtest for invalid strategy windows', async () => {
@@ -137,14 +163,12 @@ async function mockFetch(input: RequestInfo | URL) {
     });
   }
   if (url.endsWith('/api/backtest/ma-crossover')) return json(backtestResponse);
-  if (url.endsWith('/api/upload-csv')) {
+  if (url.includes('/market/binance/klines')) return json(candles);
+  if (url.endsWith('/data/upload')) {
     if (invalidUpload) {
-      return new Response(
-        JSON.stringify({ detail: 'CSV is missing required columns: high, low.' }),
-        {
-          status: 400,
-        },
-      );
+      return new Response(JSON.stringify({ detail: 'Missing required columns: high, low.' }), {
+        status: 400,
+      });
     }
     return json(candles);
   }

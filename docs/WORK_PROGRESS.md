@@ -23,6 +23,11 @@ Implemented with minimal scoped changes:
   - Backend API tests: `python -m pytest -q` from `backend` -> 15 passed.
   - Frontend production build: `npm.cmd run build` from `frontend` -> TypeScript and Vite build passed.
   - Prepared for GitHub commit/push with the Binance data flow, file upload flow, chart UI, backtest stats, tests, and README updates included.
+- CI repair pass completed:
+  - Frontend Prettier check fixed for the chart/UI files.
+  - Backend Ruff lint/format issues fixed for Binance/data-loader/backtester code.
+  - App tests updated for the new generic upload endpoint and chart-library test mocking.
+  - Full local CI-equivalent checks passed before pushing the fix.
 
 Support/resistance zone note:
 
