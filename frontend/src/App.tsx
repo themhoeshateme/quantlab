@@ -1,0 +1,933 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  calculateIndicators,
+  getHealth,
+  getSampleData,
+  runMaCrossoverBacktest,
+  uploadCsv,
+} from './api/client';
+import { CandleChart } from './components/CandleChart';
+import { DataLoader } from './components/DataLoader';
+import sampleCandles from './data/sample-ohlcv.json';
+import { runMovingAverageCrossoverBacktest } from './backtest/movingAverageCrossover';
+import {
+  BollingerBandPoint,
+  calculateBollingerBands,
+  calculateEma,
+  calculateRsi,
+  calculateSma,
+} from './indicators';
+import { ApiBacktestResponse, BacktestResult, Candle, NullableNumber, Trade } from './utils/types';
+
+type Section = 'Terminal' | 'Strategies' | 'Portfolio' | 'Backtests' | 'History' | 'Monitor';
+type ApiStatus = 'checking' | 'connected' | 'fallback';
+
+interface HistoryEntry {
+  id: string;
+  strategy: string;
+  asset: string;
+  timeframe: string;
+  netProfit: number;
+  winRate: number;
+  maxDrawdown: number;
+  totalTrades: number;
+  status: string;
+  timestamp: string;
+}
+
+const defaultCandles = sampleCandles as Candle[];
+const navItems: Section[] = ['Terminal', 'Strategies', 'Portfolio', 'Backtests', 'History'];
+const historyKey = 'quantlab.backtestHistory';
+
+function App() {
+  const [section, setSection] = useState<Section>(() => readSectionFromHash());
+  const [candles, setCandles] = useState<Candle[]>(defaultCandles);
+  const [dataSource, setDataSource] = useState('Bundled fallback sample data');
+  const [shortWindow, setShortWindow] = useState(5);
+  const [longWindow, setLongWindow] = useState(12);
+  const [initialCash, setInitialCash] = useState(10_000);
+  const [feeRate, setFeeRate] = useState(0.001);
+  const [timeframe] = useState('15m');
+  const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
+  const [statusMessage, setStatusMessage] = useState('Checking backend health...');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoadingSample, setIsLoadingSample] = useState(false);
+  const [isRunningBacktest, setIsRunningBacktest] = useState(false);
+  const [indicatorMenuOpen, setIndicatorMenuOpen] = useState(false);
+  const [visibleIndicators, setVisibleIndicators] = useState({
+    smaShort: true,
+    smaLong: true,
+    ema: true,
+    rsi: true,
+    bollinger: true,
+  });
+  const [apiIndicators, setApiIndicators] = useState<{
+    smaShort: NullableNumber[];
+    smaLong: NullableNumber[];
+    ema: NullableNumber[];
+    rsi: NullableNumber[];
+    bands: Array<BollingerBandPoint | null>;
+  } | null>(null);
+  const [apiBacktest, setApiBacktest] = useState<ApiBacktestResponse | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => readHistory());
+
+  const closes = useMemo(() => candles.map((candle) => candle.close), [candles]);
+  const strategyError = validateStrategy(shortWindow, longWindow, candles.length);
+  const fallbackSmaShort = useMemo(
+    () => calculateSma(closes, Math.max(shortWindow, 2)),
+    [closes, shortWindow],
+  );
+  const fallbackSmaLong = useMemo(
+    () => calculateSma(closes, Math.max(longWindow, 3)),
+    [closes, longWindow],
+  );
+  const fallbackEma = useMemo(() => calculateEma(closes, 10), [closes]);
+  const fallbackRsi = useMemo(() => calculateRsi(closes, 14), [closes]);
+  const fallbackBands = useMemo(() => calculateBollingerBands(closes, 20, 2), [closes]);
+  const fallbackBacktest = useMemo(
+    () =>
+      strategyError
+        ? emptyBacktest()
+        : runMovingAverageCrossoverBacktest(candles, {
+            shortPeriod: shortWindow,
+            longPeriod: longWindow,
+            initialCash,
+          }),
+    [candles, initialCash, longWindow, shortWindow, strategyError],
+  );
+  const smaShort = apiIndicators?.smaShort ?? fallbackSmaShort;
+  const smaLong = apiIndicators?.smaLong ?? fallbackSmaLong;
+  const ema = apiIndicators?.ema ?? fallbackEma;
+  const rsi = apiIndicators?.rsi ?? fallbackRsi;
+  const bands = apiIndicators?.bands ?? fallbackBands;
+  const backtest = useMemo(
+    () => (apiBacktest ? fromApiBacktest(apiBacktest) : fallbackBacktest),
+    [apiBacktest, fallbackBacktest],
+  );
+  const latestIndex = candles.length - 1;
+  const latestCandle = candles[latestIndex];
+  const latestBand = bands[latestIndex];
+  const latestSignal = getLatestSignal(apiBacktest, backtest);
+
+  useEffect(() => {
+    checkHealth();
+    loadSampleData();
+  }, []);
+
+  useEffect(() => {
+    window.history.replaceState(null, '', `#${section.toLowerCase()}`);
+  }, [section]);
+
+  useEffect(() => {
+    refreshIndicators();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candles, shortWindow, longWindow]);
+
+  async function checkHealth() {
+    try {
+      await getHealth();
+      setApiStatus('connected');
+      setStatusMessage('API connected');
+    } catch {
+      setApiStatus('fallback');
+      setStatusMessage('Backend unavailable. Local fallback is active.');
+    }
+  }
+
+  async function loadSampleData() {
+    setIsLoadingSample(true);
+    setError(null);
+    try {
+      const apiCandles = await getSampleData();
+      setCandles(apiCandles);
+      setDataSource('FastAPI sample BTC-USD candles');
+      setApiBacktest(null);
+      setApiStatus('connected');
+      setStatusMessage('Sample data loaded from API.');
+    } catch {
+      setCandles(defaultCandles);
+      setDataSource('Bundled fallback sample data');
+      setApiBacktest(null);
+      setApiStatus('fallback');
+      setStatusMessage('Backend unavailable. Loaded bundled fallback sample data.');
+    } finally {
+      setIsLoadingSample(false);
+    }
+  }
+
+  async function handleUpload(file: File) {
+    setError(null);
+    try {
+      const uploaded = await uploadCsv(file);
+      setCandles(uploaded);
+      setDataSource(file.name);
+      setApiBacktest(null);
+      setStatusMessage(`Loaded ${uploaded.length} candles from ${file.name}.`);
+      setApiStatus('connected');
+    } catch (uploadError) {
+      const message = parseError(
+        uploadError,
+        'Invalid CSV. Required columns: timestamp/date, open, high, low, close, volume.',
+      );
+      setError(message);
+    }
+  }
+
+  async function refreshIndicators() {
+    if (strategyError) return;
+    try {
+      const response = await calculateIndicators(candles, {
+        sma: [shortWindow, longWindow],
+        ema: [10],
+        rsi: 14,
+        bollinger: 20,
+      });
+      setApiIndicators({
+        smaShort: readNumberArray(response[`sma_${shortWindow}`]),
+        smaLong: readNumberArray(response[`sma_${longWindow}`]),
+        ema: readNumberArray(response.ema_10),
+        rsi: readNumberArray(response.rsi_14),
+        bands: readBands(response.bollinger_20),
+      });
+      setApiStatus('connected');
+    } catch {
+      setApiIndicators(null);
+      setApiStatus('fallback');
+    }
+  }
+
+  async function handleRunBacktest() {
+    if (strategyError) return;
+    setIsRunningBacktest(true);
+    setError(null);
+    setStatusMessage('Running backtest...');
+    try {
+      const result = await runMaCrossoverBacktest({
+        candles,
+        shortWindow,
+        longWindow,
+        initialCash,
+        feeRate,
+      });
+      setApiBacktest(result);
+      setApiStatus('connected');
+      setStatusMessage('Backtest completed successfully.');
+      const entry = toHistoryEntry(result, timeframe);
+      const next = [entry, ...history].slice(0, 25);
+      setHistory(next);
+      localStorage.setItem(historyKey, JSON.stringify(next));
+      setSection('Backtests');
+    } catch (runError) {
+      setApiStatus('fallback');
+      setError(parseError(runError, 'Backtest failed. Start the FastAPI backend and try again.'));
+      setStatusMessage('Backtest failed.');
+    } finally {
+      setIsRunningBacktest(false);
+    }
+  }
+
+  function clearHistory() {
+    setHistory([]);
+    localStorage.removeItem(historyKey);
+  }
+
+  function exportHistoryCsv() {
+    downloadCsv(
+      'quantlab-backtest-history.csv',
+      ['strategy,asset,timeframe,net_profit,win_rate,max_drawdown,total_trades,status,timestamp'],
+      history.map((item) =>
+        [
+          item.strategy,
+          item.asset,
+          item.timeframe,
+          item.netProfit,
+          item.winRate,
+          item.maxDrawdown,
+          item.totalTrades,
+          item.status,
+          item.timestamp,
+        ].join(','),
+      ),
+    );
+  }
+
+  function exportTradeLogCsv() {
+    downloadCsv(
+      'quantlab-trade-log.csv',
+      ['entry_time,exit_time,entry_price,exit_price,profit,profit_pct'],
+      backtest.trades.map((trade) =>
+        [
+          trade.entryDate,
+          trade.exitDate,
+          trade.entryPrice,
+          trade.exitPrice,
+          trade.profit,
+          trade.returnPct,
+        ].join(','),
+      ),
+    );
+  }
+
+  return (
+    <main className="terminal-shell">
+      <aside className="terminal-sidebar" aria-label="Primary navigation">
+        <div className="brand-lockup">
+          <div className="brand-mark">QL</div>
+          <div>
+            <h1>QuantLab</h1>
+            <span>Open-source terminal</span>
+          </div>
+        </div>
+
+        <nav className="side-nav">
+          {navItems.map((item) => (
+            <button
+              className={section === item ? 'nav-item active' : 'nav-item'}
+              key={item}
+              onClick={() => setSection(item)}
+            >
+              <span className="nav-dot" />
+              {item}
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="system-card">
+            <span>Backend</span>
+            <strong>{apiStatus === 'connected' ? 'API connected' : 'Local fallback'}</strong>
+            <small>{statusMessage}</small>
+          </div>
+          <button
+            className="nav-item"
+            type="button"
+            title="Settings are planned for a later milestone."
+            disabled
+          >
+            Settings
+          </button>
+          <button
+            className="nav-item"
+            type="button"
+            title="Support channel setup is coming soon."
+            disabled
+          >
+            Support
+          </button>
+        </div>
+      </aside>
+
+      <section className="terminal-main">
+        <header className="topbar">
+          <div className="tab-group" aria-label="Workspace sections">
+            <button
+              className={section === 'Terminal' ? 'top-tab active' : 'top-tab'}
+              onClick={() => setSection('Terminal')}
+            >
+              Workspace
+            </button>
+            <button
+              className={section === 'Backtests' ? 'top-tab active' : 'top-tab'}
+              onClick={() => setSection('Backtests')}
+            >
+              Backtest
+            </button>
+            <button
+              className="top-tab"
+              disabled
+              title="Coming soon: optimization is not implemented in the foundation MVP."
+            >
+              Optimize
+            </button>
+            <button
+              className="top-tab"
+              disabled
+              title="Coming soon: live trading is not implemented in the foundation MVP."
+            >
+              Live
+            </button>
+          </div>
+
+          <div className="market-controls">
+            <div className="market-ticker">
+              <span>Last</span>
+              <strong>{formatMoney(latestCandle?.close ?? 0)}</strong>
+            </div>
+            <select
+              aria-label="Asset selector"
+              value="BTCUSDT"
+              disabled
+              title="BTCUSDT is the only bundled sample asset in this foundation MVP."
+              onChange={() => undefined}
+            >
+              <option>BTCUSDT</option>
+            </select>
+            <div className="timeframe-group" aria-label="Timeframe selector">
+              {['1m', '5m', '15m', '1h'].map((item) => (
+                <button
+                  className={timeframe === item ? 'timeframe active' : 'timeframe'}
+                  key={item}
+                  disabled={timeframe !== item}
+                  onClick={() => setStatusMessage('15m sample timeframe is already selected.')}
+                  title={
+                    timeframe === item
+                      ? 'Current sample timeframe. Click confirms the active sample timeframe.'
+                      : 'Coming soon: timeframe resampling is not implemented yet.'
+                  }
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <button className="ghost-button" onClick={() => setIndicatorMenuOpen((open) => !open)}>
+              Indicators
+            </button>
+            <button
+              className="purple-button"
+              disabled
+              title="Coming soon: deployment is not implemented in the foundation MVP."
+            >
+              Deploy
+            </button>
+            <button className="ghost-button" onClick={() => setSection('Monitor')}>
+              Monitor
+            </button>
+          </div>
+        </header>
+
+        {indicatorMenuOpen ? (
+          <section className="terminal-panel indicator-menu">
+            {Object.entries({
+              smaShort: `SMA ${shortWindow}`,
+              smaLong: `SMA ${longWindow}`,
+              ema: 'EMA 10',
+              rsi: 'RSI 14',
+              bollinger: 'Bollinger Bands',
+            }).map(([key, label]) => (
+              <label key={key} className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={visibleIndicators[key as keyof typeof visibleIndicators]}
+                  onChange={() =>
+                    setVisibleIndicators((current) => ({
+                      ...current,
+                      [key]: !current[key as keyof typeof current],
+                    }))
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </section>
+        ) : null}
+
+        {section === 'Terminal' ? renderTerminal() : null}
+        {section === 'Strategies' ? renderStrategies() : null}
+        {section === 'Portfolio' ? (
+          <InfoPage
+            title="Portfolio"
+            message="Portfolio tracking is planned. No live trading is implemented yet."
+          />
+        ) : null}
+        {section === 'Monitor' ? (
+          <InfoPage title="Monitor" message={`Read-only status: ${statusMessage}`} />
+        ) : null}
+        {section === 'Backtests' ? renderBacktests() : null}
+        {section === 'History' ? renderHistory() : null}
+      </section>
+    </main>
+  );
+
+  function renderTerminal() {
+    return (
+      <>
+        <section className="workspace-grid">
+          <section className="chart-panel terminal-panel">
+            <PanelHeading
+              eyebrow="Terminal"
+              title="BTCUSDT strategy workspace"
+              status={apiStatus === 'connected' ? 'API connected' : 'Local fallback'}
+            />
+            <div className="chart-statline">
+              <span>O {formatCompact(latestCandle?.open ?? 0)}</span>
+              <span>H {formatCompact(latestCandle?.high ?? 0)}</span>
+              <span>L {formatCompact(latestCandle?.low ?? 0)}</span>
+              <span>C {formatCompact(latestCandle?.close ?? 0)}</span>
+              <span>Vol {formatCompact(latestCandle?.volume ?? 0)}</span>
+            </div>
+            <div className="indicator-strip" aria-label="Current indicator values">
+              {visibleIndicators.smaShort ? (
+                <IndicatorPill
+                  label={`SMA ${shortWindow}`}
+                  value={smaShort[latestIndex]}
+                  tone="green"
+                />
+              ) : null}
+              {visibleIndicators.smaLong ? (
+                <IndicatorPill
+                  label={`SMA ${longWindow}`}
+                  value={smaLong[latestIndex]}
+                  tone="purple"
+                />
+              ) : null}
+              {visibleIndicators.ema ? (
+                <IndicatorPill label="EMA 10" value={ema[latestIndex]} tone="blue" />
+              ) : null}
+              {visibleIndicators.rsi ? (
+                <IndicatorPill label="RSI 14" value={rsi[latestIndex]} tone="neutral" />
+              ) : null}
+              {visibleIndicators.bollinger ? (
+                <IndicatorPill label="BB Upper" value={latestBand?.upper ?? null} tone="neutral" />
+              ) : null}
+              {visibleIndicators.bollinger ? (
+                <IndicatorPill label="BB Lower" value={latestBand?.lower ?? null} tone="neutral" />
+              ) : null}
+            </div>
+            <CandleChart
+              candles={candles}
+              shortSma={smaShort}
+              longSma={smaLong}
+              trades={backtest.trades}
+              showShortSma={visibleIndicators.smaShort}
+              showLongSma={visibleIndicators.smaLong}
+            />
+          </section>
+          <aside className="right-rail">
+            {renderControls()}
+            <DataLoader
+              onUpload={handleUpload}
+              onResetSample={loadSampleData}
+              status={
+                isLoadingSample
+                  ? 'Loading sample data...'
+                  : `${candles.length} candles loaded from ${dataSource}.`
+              }
+              error={error}
+            />
+          </aside>
+        </section>
+        {renderMetricsAndTrades()}
+      </>
+    );
+  }
+
+  function renderControls() {
+    return (
+      <section className="terminal-panel controls-panel">
+        <PanelHeading eyebrow="Execution" title="Backtest Controls" />
+        <div className="strategy-card">
+          <span>Strategy</span>
+          <strong>
+            SMA crossover {shortWindow}/{longWindow}
+          </strong>
+          <small>Run explicitly after changing parameters. No live execution is included.</small>
+        </div>
+        <div className="execution-grid">
+          <label>
+            <span>Initial equity</span>
+            <input
+              type="number"
+              value={initialCash}
+              min="1"
+              onChange={(event) => setInitialCash(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            <span>Fee rate</span>
+            <input
+              type="number"
+              value={feeRate}
+              min="0"
+              step="0.001"
+              onChange={(event) => setFeeRate(Number(event.target.value))}
+            />
+          </label>
+        </div>
+        <label className="field">
+          <span>Short window</span>
+          <input
+            min="2"
+            type="number"
+            value={shortWindow}
+            onChange={(event) => setShortWindow(Number(event.target.value))}
+          />
+        </label>
+        <label className="field">
+          <span>Long window</span>
+          <input
+            min="3"
+            type="number"
+            value={longWindow}
+            onChange={(event) => setLongWindow(Number(event.target.value))}
+          />
+        </label>
+        {strategyError ? <p className="status-text error-text">{strategyError}</p> : null}
+        <button
+          className="run-button"
+          type="button"
+          onClick={handleRunBacktest}
+          disabled={Boolean(strategyError) || isRunningBacktest}
+        >
+          {isRunningBacktest ? 'Running Backtest...' : 'Run Backtest'}
+        </button>
+        <div className="signal-box">
+          <span>Latest signal</span>
+          <strong>{latestSignal}</strong>
+          <small>{statusMessage}</small>
+        </div>
+      </section>
+    );
+  }
+
+  function renderMetricsAndTrades() {
+    return (
+      <section className="bottom-grid">
+        <section className="terminal-panel status-panel">
+          <h2 className="visually-hidden">Strategy results</h2>
+          <Metric
+            label="Session status"
+            value={apiStatus === 'connected' ? 'API Ready' : 'Fallback'}
+            tone={apiStatus === 'connected' ? 'positive' : 'muted-strong'}
+          />
+          <Metric label="Total trades" value={String(backtest.totalTrades)} />
+          <Metric
+            label="Net profit"
+            value={formatMoney(backtest.netProfit)}
+            tone={backtest.netProfit >= 0 ? 'positive' : 'negative'}
+          />
+          <Metric label="Win rate" value={`${backtest.winRate.toFixed(2)}%`} />
+          <Metric
+            label="Max drawdown"
+            value={`${backtest.maxDrawdown.toFixed(2)}%`}
+            tone="negative"
+          />
+          <Metric label="Sharpe ratio" value="Not implemented" tone="muted-strong" />
+        </section>
+        <section className="terminal-panel trade-preview">
+          <PanelHeading eyebrow="Signals" title="Trade log" />
+          <button
+            className="ghost-button small-action"
+            onClick={exportTradeLogCsv}
+            disabled={backtest.trades.length === 0}
+            title={
+              backtest.trades.length === 0
+                ? 'No trades generated to export.'
+                : 'Export trade log CSV'
+            }
+          >
+            Export Trade Log CSV
+          </button>
+          <TradePreview trades={backtest.trades} />
+        </section>
+      </section>
+    );
+  }
+
+  function renderStrategies() {
+    return (
+      <section className="terminal-panel page-panel">
+        <PanelHeading eyebrow="Strategies" title="Available Strategies" />
+        <div className="strategy-card">
+          <span>Available</span>
+          <strong>SMA crossover</strong>
+          <small>Uses backend-calculated moving averages and explicit backtest execution.</small>
+        </div>
+      </section>
+    );
+  }
+
+  function renderBacktests() {
+    return (
+      <>
+        <section className="terminal-panel page-panel">
+          <PanelHeading eyebrow="Backtest" title="Latest Backtest Summary" />
+          {renderMetricsAndTrades()}
+        </section>
+      </>
+    );
+  }
+
+  function renderHistory() {
+    return (
+      <section className="terminal-panel history-panel">
+        <PanelHeading eyebrow="History" title="Saved Local Backtest History" />
+        <div className="button-row">
+          <button
+            onClick={exportHistoryCsv}
+            disabled={history.length === 0}
+            title={
+              history.length === 0
+                ? 'Run a backtest before exporting history.'
+                : 'Export saved backtest history as CSV.'
+            }
+          >
+            Export CSV
+          </button>
+          <button
+            className="secondary"
+            onClick={clearHistory}
+            disabled={history.length === 0}
+            title={
+              history.length === 0
+                ? 'No saved backtest history to clear.'
+                : 'Clear saved local backtest history.'
+            }
+          >
+            Clear History
+          </button>
+        </div>
+        <HistoryTable history={history} />
+      </section>
+    );
+  }
+}
+
+function PanelHeading({
+  eyebrow,
+  title,
+  status,
+}: {
+  eyebrow: string;
+  title: string;
+  status?: string;
+}) {
+  return (
+    <div className="panel-header compact">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h2>{title}</h2>
+      </div>
+      {status ? (
+        <div className="live-status">
+          <span />
+          {status}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="metric-tile">
+      <span>{label}</span>
+      <strong className={tone}>{value}</strong>
+    </div>
+  );
+}
+
+function InfoPage({ title, message }: { title: string; message: string }) {
+  return (
+    <section className="terminal-panel page-panel">
+      <PanelHeading eyebrow={title} title={title} />
+      <p className="empty-state">{message}</p>
+    </section>
+  );
+}
+
+function IndicatorPill({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | null;
+  tone: 'green' | 'purple' | 'blue' | 'neutral';
+}) {
+  return (
+    <span className={`indicator-pill ${tone}`}>
+      {label}
+      <strong>{value === null ? 'Pending' : formatCompact(value)}</strong>
+    </span>
+  );
+}
+
+function TradePreview({ trades }: { trades: Trade[] }) {
+  if (trades.length === 0)
+    return (
+      <p className="empty-state">No trades generated. Run a backtest to populate the trade log.</p>
+    );
+  return (
+    <div className="compact-log">
+      {trades.map((trade) => (
+        <div className="log-row" key={`${trade.entryDate}-${trade.exitDate}`}>
+          <span>
+            {trade.entryDate} / {trade.exitDate}
+          </span>
+          <strong className={trade.profit >= 0 ? 'positive' : 'negative'}>
+            {formatMoney(trade.profit)}
+          </strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HistoryTable({ history }: { history: HistoryEntry[] }) {
+  if (history.length === 0)
+    return <p className="empty-state">No saved backtests yet. Run a backtest to create history.</p>;
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Strategy name</th>
+            <th>Asset/timeframe</th>
+            <th>Net profit</th>
+            <th>Win rate</th>
+            <th>Drawdown</th>
+            <th>Status</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.map((item) => (
+            <tr key={item.id}>
+              <td>{item.strategy}</td>
+              <td>
+                {item.asset} / {item.timeframe}
+              </td>
+              <td className={item.netProfit >= 0 ? 'positive' : 'negative'}>
+                {formatMoney(item.netProfit)}
+              </td>
+              <td>{item.winRate.toFixed(2)}%</td>
+              <td className="negative">{item.maxDrawdown.toFixed(2)}%</td>
+              <td>
+                <span className="status-chip">{item.status}</span>
+              </td>
+              <td>{item.timestamp}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function fromApiBacktest(response: ApiBacktestResponse): BacktestResult {
+  return {
+    totalTrades: response.summary.total_trades,
+    netProfit: response.summary.net_profit,
+    winRate: response.summary.win_rate,
+    maxDrawdown: response.summary.max_drawdown,
+    finalEquity: response.summary.final_equity,
+    trades: response.trades.map((trade) => ({
+      entryDate: trade.entry_time,
+      exitDate: trade.exit_time,
+      entryPrice: trade.entry_price,
+      exitPrice: trade.exit_price,
+      profit: trade.profit,
+      returnPct: trade.profit_pct,
+    })),
+    equityCurve: response.equity_curve,
+  };
+}
+
+function toHistoryEntry(response: ApiBacktestResponse, timeframe: string): HistoryEntry {
+  return {
+    id: `${Date.now()}`,
+    strategy: 'SMA crossover',
+    asset: 'BTCUSDT',
+    timeframe,
+    netProfit: response.summary.net_profit,
+    winRate: response.summary.win_rate,
+    maxDrawdown: response.summary.max_drawdown,
+    totalTrades: response.summary.total_trades,
+    status: 'Completed',
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function readHistory(): HistoryEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(historyKey) ?? '[]') as HistoryEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function readSectionFromHash(): Section {
+  const hash = window.location.hash.replace('#', '').toLowerCase();
+  const match = navItems.find((item) => item.toLowerCase() === hash);
+  if (match) return match;
+  if (hash === 'monitor') return 'Monitor';
+  return 'Terminal';
+}
+
+function readNumberArray(value: unknown): NullableNumber[] {
+  return Array.isArray(value) ? value.map((item) => (typeof item === 'number' ? item : null)) : [];
+}
+
+function readBands(value: unknown): Array<BollingerBandPoint | null> {
+  if (!value || typeof value !== 'object') return [];
+  const bands = value as { upper?: unknown; middle?: unknown; lower?: unknown };
+  const upper = readNumberArray(bands.upper);
+  const middle = readNumberArray(bands.middle);
+  const lower = readNumberArray(bands.lower);
+  return middle.map((middleValue, index) =>
+    middleValue === null || upper[index] === null || lower[index] === null
+      ? null
+      : { middle: middleValue, upper: upper[index] as number, lower: lower[index] as number },
+  );
+}
+
+function validateStrategy(
+  shortWindow: number,
+  longWindow: number,
+  candleCount: number,
+): string | null {
+  if (shortWindow < 2) return 'Short window must be at least 2.';
+  if (longWindow <= shortWindow) return 'Long window must be greater than short window.';
+  if (longWindow > candleCount) return 'Long window cannot be larger than the number of candles.';
+  return null;
+}
+
+function emptyBacktest(): BacktestResult {
+  return {
+    totalTrades: 0,
+    netProfit: 0,
+    winRate: 0,
+    maxDrawdown: 0,
+    finalEquity: 0,
+    trades: [],
+    equityCurve: [],
+  };
+}
+
+function getLatestSignal(
+  apiBacktest: ApiBacktestResponse | null,
+  backtest: BacktestResult,
+): string {
+  const latest = apiBacktest?.signals.at(-1);
+  if (latest) return `${latest.type.toUpperCase()} at ${formatMoney(latest.price)}`;
+  return backtest.totalTrades > 0 ? 'Backtest completed' : 'No signal yet';
+}
+
+function parseError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message.replace(/[{}"]/g, '') : fallback;
+}
+
+function downloadCsv(filename: string, header: string[], rows: string[]) {
+  const csv = [...header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatCompact(value: number): string {
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 2,
+  });
+}
+
+export default App;

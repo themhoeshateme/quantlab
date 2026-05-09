@@ -1,0 +1,15 @@
+- name: good first issue
+  color: '7057ff'
+  description: Beginner-friendly task with a small, clear scope
+- name: bug
+  color: 'd73a4a'
+  description: Something is broken or behaving unexpectedly
+- name: feature
+  color: '0e8a16'
+  description: New feature or enhancement
+- name: help wanted
+  color: '008672'
+  description: Extra help from contributors is welcome
+- name: documentation
+  color: '0075ca'
+  description: Documentation updates or improvements

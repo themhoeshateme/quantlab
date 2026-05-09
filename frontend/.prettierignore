@@ -1,0 +1,8 @@
+dist
+coverage
+node_modules
+backend/.venv
+backend/.ruff_cache
+backend/.pytest_cache
+backend/pytest-cache-files-*
+backend/*.egg-info
