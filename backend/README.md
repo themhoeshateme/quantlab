@@ -1,6 +1,6 @@
 # QuantLab API
 
-FastAPI backend foundation for QuantLab. It validates OHLCV data, calculates technical indicators, and runs a simple moving-average crossover backtest.
+FastAPI backend foundation for QuantLab. It validates uploaded OHLCV data, fetches Binance public candles, calculates technical indicators, and runs a simple moving-average crossover backtest.
 
 Does not include authentication, live trading, brokerage APIs, databases, payments, or AI agents.
 
@@ -31,6 +31,8 @@ The API runs at `http://localhost:8000` by default.
 - `GET /health`
 - `GET /api/sample-data`
 - `POST /api/upload-csv`
+- `POST /data/upload`
+- `GET /market/binance/klines`
 - `POST /api/indicators`
 - `POST /api/backtest/ma-crossover`
 

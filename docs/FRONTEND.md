@@ -9,10 +9,17 @@ The QuantLab frontend lives in `frontend/`. It is a React + Vite + TypeScript ap
 The terminal dashboard focuses on the complete MVP path:
 
 - Load sample OHLCV data from the backend.
-- Upload validated OHLCV CSV files.
+- Fetch live Binance OHLCV candles.
+- Upload validated OHLCV CSV/XLSX files.
 - Toggle visible indicators.
 - Run the SMA crossover backtest against the FastAPI API.
-- View chart signals, metrics, and the trade log.
+- View the `lightweight-charts` candlestick/bar chart, signals, metrics, and the trade log.
+
+## OHLCV Chart
+
+![QuantLab OHLCV candlestick chart with signals](./screenshots/ohlcv-candlestick-signals.png)
+
+The chart supports candlestick and bar modes, SMA overlays, buy/sell signal markers, volume bars, zoom controls, and a hover OHLCV readout.
 
 ## Backtest History
 

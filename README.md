@@ -18,15 +18,17 @@ This repository is intentionally scoped as an initial MVP for contributors. Does
 
 - Dark React + Vite + TypeScript trading-terminal frontend
 - Python + FastAPI backend
-- Bundled sample BTC-USD OHLCV data
-- CSV upload and OHLCV validation
+- Live Binance OHLCV candle fetches by symbol, interval, and date range
+- Bundled sample BTC-USD OHLCV fallback data
+- CSV/XLSX upload and OHLCV validation
 - Technical indicators:
   - SMA
   - EMA
   - RSI
   - Bollinger Bands
 - Moving average crossover backtest
-- Backtest summary, signals, equity curve, and trade log
+- Backtest summary, Sharpe ratio, signals, equity curve, and trade log
+- Interactive `lightweight-charts` candlestick/bar chart with SMA, signal, volume, zoom, and reset controls
 - Frontend fallback calculations if the backend is not running
 - Frontend and backend tests
 - GitHub Actions CI for frontend and backend checks
@@ -40,6 +42,7 @@ Frontend:
 - Vite
 - TypeScript
 - Plain CSS
+- Lightweight Charts
 - Vitest
 - ESLint
 - Prettier
@@ -52,6 +55,8 @@ Backend:
 - Pydantic
 - Pytest
 - HTTPX
+- Pandas
+- OpenPyXL
 - Ruff
 
 ## Screenshots
@@ -59,9 +64,14 @@ Backend:
 Current UI screenshots are documented in `docs/FRONTEND.md` and stored under `docs/screenshots/`:
 
 - `docs/screenshots/terminal-dashboard.png`
+- `docs/screenshots/ohlcv-candlestick-signals.png`
 - `docs/screenshots/backtest-history.png`
 
 ![QuantLab terminal dashboard](docs/screenshots/terminal-dashboard.png)
+
+![QuantLab OHLCV candlestick chart with signals](docs/screenshots/ohlcv-candlestick-signals.png)
+
+![QuantLab backtest history](docs/screenshots/backtest-history.png)
 
 ## Frontend Setup
 
@@ -126,6 +136,8 @@ The backend runs at `http://localhost:8000`. The frontend reads `VITE_API_URL`, 
 - `GET /health` returns backend service status.
 - `GET /api/sample-data` returns bundled OHLCV candles.
 - `POST /api/upload-csv` validates and normalizes OHLCV CSV uploads.
+- `POST /data/upload` validates and normalizes OHLCV CSV/XLSX uploads.
+- `GET /market/binance/klines` fetches Binance public OHLCV candles.
 - `POST /api/indicators` calculates SMA, EMA, RSI, and Bollinger Bands.
 - `POST /api/backtest/ma-crossover` runs the moving-average crossover backtest.
 
@@ -152,7 +164,7 @@ pytest
 
 ## CSV Format
 
-CSV uploads must include `timestamp` or `date`, plus these numeric columns:
+CSV/XLSX uploads must include a time column such as `timestamp`, `date`, `datetime`, or `time`, plus these numeric columns:
 
 ```csv
 timestamp,open,high,low,close,volume
@@ -192,8 +204,8 @@ Without GitHub CLI, create the labels manually in the GitHub repository settings
 - No live trading or brokerage execution.
 - No authentication or user accounts.
 - No database or persisted backtest history.
-- Sharpe ratio is intentionally shown as not implemented.
-- The chart is a lightweight SVG visualization, not a full charting engine.
+- No order execution, portfolio accounting, or risk engine.
+- Support/resistance zones are planned but not implemented yet.
 
 ## Repository Structure
 

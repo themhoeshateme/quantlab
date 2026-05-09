@@ -33,11 +33,11 @@ Support/resistance zone note:
 
 - TODO: add a translucent support/resistance zone overlay with a chart primitive or plugin. This was deferred to keep the current pass scoped and avoid breaking chart rendering.
 
-Screenshot placeholders:
+Screenshot captures:
 
 - `docs/screenshots/ohlcv-candlestick-signals.png`
-- `docs/screenshots/ohlcv-bar-chart.png`
-- `docs/screenshots/readme-badges.png`
+- `docs/screenshots/terminal-dashboard.png`
+- `docs/screenshots/backtest-history.png`
 
 ## 2026-05-09 - Backtesting and Data Features
 
