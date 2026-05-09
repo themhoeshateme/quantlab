@@ -1,1 +1,1 @@
-"""QuantLab FastAPI application package."""
+"""QuantNova FastAPI application package."""

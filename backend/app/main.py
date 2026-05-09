@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 
 app = FastAPI(
-    title="QuantLab API",
+    title="QuantNova API",
     description="Backend foundation for OHLCV validation, indicators, and simple backtesting.",
     version="0.1.0",
 )
@@ -20,7 +20,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "quantlab-api"}
+    return {"status": "ok", "service": "QuantNova-api"}
 
 
 app.include_router(router)

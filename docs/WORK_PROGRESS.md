@@ -1,4 +1,4 @@
-# QuantLab Work Progress
+# QuantNova Work Progress
 
 ## 2026-05-09 - TradingView-style OHLCV chart improvements
 

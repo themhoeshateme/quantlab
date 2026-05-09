@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest a focused improvement for QuantLab
+about: Suggest a focused improvement for QuantNova
 title: 'feat: '
 labels: feature
 assignees: ''

@@ -1,6 +1,6 @@
-# Contributing to QuantLab
+# Contributing to QuantNova
 
-Thanks for helping improve QuantLab. This project is designed to be beginner-friendly while keeping code quality high.
+Thanks for helping improve QuantNova. This project is designed to be beginner-friendly while keeping code quality high.
 
 ## Pull Request Format
 

@@ -76,14 +76,14 @@ describe('App', () => {
     invalidUpload = false;
     vi.restoreAllMocks();
     vi.stubGlobal('fetch', vi.fn(mockFetch));
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:quantlab');
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:QuantNova');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
   });
 
-  it('renders the QuantLab dashboard', async () => {
+  it('renders the QuantNova dashboard', async () => {
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'QuantLab' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'QuantNova' })).toBeInTheDocument();
     expect(screen.getByText('OHLCV loader')).toBeInTheDocument();
     expect(screen.getByText('Strategy results')).toBeInTheDocument();
     expect(screen.getByText('Trade log')).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('App', () => {
 
     expect(await screen.findAllByText('$250.00')).not.toHaveLength(0);
     expect(screen.getByText('Backtest completed successfully.')).toBeInTheDocument();
-    expect(localStorage.getItem('quantlab.backtestHistory')).toContain('SMA crossover');
+    expect(localStorage.getItem('QuantNova.backtestHistory')).toContain('SMA crossover');
   });
 
   it('shows invalid CSV upload errors from the API', async () => {
@@ -147,7 +147,7 @@ describe('App', () => {
 
 async function mockFetch(input: RequestInfo | URL) {
   const url = String(input);
-  if (url.endsWith('/health')) return json({ status: 'ok', service: 'quantlab-api' });
+  if (url.endsWith('/health')) return json({ status: 'ok', service: 'QuantNova-api' });
   if (url.endsWith('/api/sample-data')) return json(candles);
   if (url.endsWith('/api/indicators')) {
     return json({

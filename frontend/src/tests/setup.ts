@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 
 Object.defineProperty(URL, 'createObjectURL', {
   configurable: true,
-  value: vi.fn(() => 'blob:quantlab'),
+  value: vi.fn(() => 'blob:QuantNova'),
 });
 
 Object.defineProperty(URL, 'revokeObjectURL', {

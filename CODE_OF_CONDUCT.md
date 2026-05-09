@@ -2,7 +2,7 @@
 
 ## Our Pledge
 
-We pledge to make participation in QuantLab a welcoming and respectful experience for everyone, regardless of background, identity, experience level, or location.
+We pledge to make participation in QuantNova a welcoming and respectful experience for everyone, regardless of background, identity, experience level, or location.
 
 ## Expected Behavior
 

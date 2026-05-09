@@ -1,10 +1,10 @@
 # Frontend Overview
 
-The QuantLab frontend lives in `frontend/`. It is a React + Vite + TypeScript app that presents the FastAPI backend as a dark trading-terminal style workflow.
+The QuantNova frontend lives in `frontend/`. It is a React + Vite + TypeScript app that presents the FastAPI backend as a dark trading-terminal style workflow.
 
 ## Main Screen
 
-![QuantLab terminal dashboard](./screenshots/terminal-dashboard.png)
+![QuantNova terminal dashboard](./screenshots/terminal-dashboard.png)
 
 The terminal dashboard focuses on the complete MVP path:
 
@@ -17,13 +17,13 @@ The terminal dashboard focuses on the complete MVP path:
 
 ## OHLCV Chart
 
-![QuantLab OHLCV candlestick chart with signals](./screenshots/ohlcv-candlestick-signals.png)
+![QuantNova OHLCV candlestick chart with signals](./screenshots/ohlcv-candlestick-signals.png)
 
 The chart supports candlestick and bar modes, SMA overlays, buy/sell signal markers, volume bars, zoom controls, and a hover OHLCV readout.
 
 ## Backtest History
 
-![QuantLab backtest history](./screenshots/backtest-history.png)
+![QuantNova backtest history](./screenshots/backtest-history.png)
 
 Backtest history is intentionally local-only for this foundation. Successful runs are stored in `localStorage` and can be exported as CSV.
 

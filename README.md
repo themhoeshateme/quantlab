@@ -1,4 +1,4 @@
-# QuantLab
+# QuantNova
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111827)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -10,7 +10,7 @@
 [![Tests](https://img.shields.io/badge/tests-passing-16a34a)](#testing)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-QuantLab is an open-source GUI-based quantitative backtesting foundation for OHLCV market data, technical indicators, simple strategies, and beginner-friendly contribution.
+QuantNova is an open-source GUI-based quantitative backtesting foundation for OHLCV market data, technical indicators, simple strategies, and beginner-friendly contribution.
 
 This repository is intentionally scoped as an initial MVP for contributors. Does not include authentication, databases, brokerage integrations, payments, AI agents, or live trading execution.
 
@@ -67,11 +67,11 @@ Current UI screenshots are documented in `docs/FRONTEND.md` and stored under `do
 - `docs/screenshots/ohlcv-candlestick-signals.png`
 - `docs/screenshots/backtest-history.png`
 
-![QuantLab terminal dashboard](docs/screenshots/terminal-dashboard.png)
+![QuantNova terminal dashboard](docs/screenshots/terminal-dashboard.png)
 
-![QuantLab OHLCV candlestick chart with signals](docs/screenshots/ohlcv-candlestick-signals.png)
+![QuantNova OHLCV candlestick chart with signals](docs/screenshots/ohlcv-candlestick-signals.png)
 
-![QuantLab backtest history](docs/screenshots/backtest-history.png)
+![QuantNova backtest history](docs/screenshots/backtest-history.png)
 
 ## Frontend Setup
 

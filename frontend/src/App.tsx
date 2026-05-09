@@ -38,7 +38,7 @@ interface HistoryEntry {
 
 const defaultCandles = sampleCandles as Candle[];
 const navItems: Section[] = ['Terminal', 'Strategies', 'Portfolio', 'Backtests', 'History'];
-const historyKey = 'quantlab.backtestHistory';
+const historyKey = 'QuantNova.backtestHistory';
 const defaultLiveRange = getRecentDateRange(7);
 
 function App() {
@@ -306,7 +306,7 @@ function App() {
 
   function exportHistoryCsv() {
     downloadCsv(
-      'quantlab-backtest-history.csv',
+      'QuantNova-backtest-history.csv',
       ['strategy,asset,timeframe,net_profit,win_rate,max_drawdown,total_trades,status,timestamp'],
       history.map((item) =>
         [
@@ -326,7 +326,7 @@ function App() {
 
   function exportTradeLogCsv() {
     downloadCsv(
-      'quantlab-trade-log.csv',
+      'QuantNova-trade-log.csv',
       ['entry_time,exit_time,entry_price,exit_price,profit,profit_pct'],
       backtest.trades.map((trade) =>
         [
@@ -347,7 +347,7 @@ function App() {
         <div className="brand-lockup">
           <div className="brand-mark">QL</div>
           <div>
-            <h1>QuantLab</h1>
+            <h1>QuantNova</h1>
             <span>Open-source terminal</span>
           </div>
         </div>

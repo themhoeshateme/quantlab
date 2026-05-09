@@ -1,6 +1,6 @@
-# QuantLab API
+# QuantNova API
 
-FastAPI backend foundation for QuantLab. It validates uploaded OHLCV data, fetches Binance public candles, calculates technical indicators, and runs a simple moving-average crossover backtest.
+FastAPI backend foundation for QuantNova. It validates uploaded OHLCV data, fetches Binance public candles, calculates technical indicators, and runs a simple moving-average crossover backtest.
 
 Does not include authentication, live trading, brokerage APIs, databases, payments, or AI agents.
 
