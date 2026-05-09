@@ -1,21 +1,23 @@
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models import BacktestRequest, BacktestResponse, Candle, IndicatorRequest
 from app.services.backtester import run_ma_crossover_backtest
+from app.services.binance import fetch_klines
 from app.services.data_loader import load_sample_candles, parse_upload_file
 from app.services.indicators import bollinger_bands, ema, rsi, sma
 
-router = APIRouter(prefix="/api")
+router = APIRouter()
 
 
-@router.get("/sample-data", response_model=list[Candle])
+@router.get("/api/sample-data", response_model=list[Candle])
 def get_sample_data() -> list[Candle]:
     return load_sample_candles()
 
 
-@router.post("/upload-csv", response_model=list[Candle])
+@router.post("/api/upload-csv", response_model=list[Candle])
 async def upload_csv(file: Annotated[UploadFile, File()]) -> list[Candle]:
     try:
         return await parse_upload_file(file)
@@ -23,7 +25,33 @@ async def upload_csv(file: Annotated[UploadFile, File()]) -> list[Candle]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/indicators")
+@router.post("/data/upload", response_model=list[Candle])
+async def upload_data(file: Annotated[UploadFile, File()]) -> list[Candle]:
+    try:
+        return await parse_upload_file(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/market/binance/klines")
+def get_binance_klines(
+    symbol: str,
+    interval: str,
+    start_date: date,
+    end_date: date,
+) -> list[dict[str, Any]]:
+    try:
+        return fetch_klines(
+            symbol=symbol,
+            interval=interval,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/indicators")
 def calculate_indicators(request: IndicatorRequest) -> dict[str, object]:
     closes = [candle.close for candle in request.candles]
     output: dict[str, object] = {}
@@ -42,7 +70,7 @@ def calculate_indicators(request: IndicatorRequest) -> dict[str, object]:
     return output
 
 
-@router.post("/backtest/ma-crossover", response_model=BacktestResponse)
+@router.post("/api/backtest/ma-crossover", response_model=BacktestResponse)
 def run_backtest(request: BacktestRequest) -> BacktestResponse:
     try:
         return run_ma_crossover_backtest(

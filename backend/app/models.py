@@ -76,8 +76,10 @@ class BacktestRequest(BaseModel):
 
 class Signal(BaseModel):
     timestamp: str
+    time: str
     type: Literal["buy", "sell"]
     price: float
+    reason: str = "SMA crossover"
 
 
 class Trade(BaseModel):
@@ -98,10 +100,25 @@ class BacktestSummary(BaseModel):
     total_trades: int
     win_rate: float
     max_drawdown: float
+    sharpe_ratio: float = 0.0
+
+
+class BacktestStats(BaseModel):
+    total_trades: int
+    net_profit: float
+    win_rate: float
+    max_drawdown: float
+    sharpe_ratio: float
+
+
+class EquityPoint(BaseModel):
+    time: str
+    value: float
 
 
 class BacktestResponse(BaseModel):
     summary: BacktestSummary
+    stats: BacktestStats
     trades: list[Trade]
     signals: list[Signal]
-    equity_curve: list[float]
+    equity_curve: list[EquityPoint]

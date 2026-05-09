@@ -42,12 +42,12 @@ export function DataLoader({ onUpload, onResetSample, status, error }: DataLoade
         </div>
       </div>
       <p className="muted">
-        Upload a CSV with date, open, high, low, close, and volume columns, or reset to the included
-        sample.
+        Upload CSV/XLSX with date/time, open, high, low, close, and volume columns, or reset to the
+        included sample.
       </p>
       <div className="button-row">
         <button type="button" onClick={() => inputRef.current?.click()} disabled={isUploading}>
-          {isUploading ? 'Uploading...' : 'Upload CSV'}
+          {isUploading ? 'Uploading...' : 'Upload File'}
         </button>
         <button
           type="button"
@@ -62,8 +62,8 @@ export function DataLoader({ onUpload, onResetSample, status, error }: DataLoade
         ref={inputRef}
         className="visually-hidden"
         type="file"
-        aria-label="Upload OHLCV CSV"
-        accept=".csv,text/csv"
+        aria-label="Upload OHLCV file"
+        accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={handleFileChange}
       />
       <p className={error ? 'status-text error-text' : 'status-text'}>{error ?? status}</p>

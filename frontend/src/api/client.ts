@@ -1,4 +1,4 @@
-import { ApiBacktestResponse, ApiCandle, Candle } from '../utils/types';
+import { ApiBacktestResponse, ApiBinanceCandle, ApiCandle, Candle } from '../utils/types';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -15,21 +15,39 @@ export async function getSampleData(): Promise<Candle[]> {
   return candles.map(fromApiCandle);
 }
 
-export async function uploadCsv(file: File): Promise<Candle[]> {
+export async function uploadData(file: File): Promise<Candle[]> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetch(`${API_URL}/api/upload-csv`, {
+  const response = await fetch(`${API_URL}/data/upload`, {
     method: 'POST',
     body: formData,
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `CSV upload failed with status ${response.status}.`);
+    const message = await readErrorMessage(response);
+    throw new Error(message || `Data upload failed with status ${response.status}.`);
   }
 
   const candles = (await response.json()) as ApiCandle[];
   return candles.map(fromApiCandle);
+}
+
+export async function fetchBinanceKlines(payload: {
+  symbol: string;
+  interval: string;
+  startDate: string;
+  endDate: string;
+}): Promise<Candle[]> {
+  const params = new URLSearchParams({
+    symbol: payload.symbol,
+    interval: payload.interval,
+    start_date: payload.startDate,
+    end_date: payload.endDate,
+  });
+  const candles = await request<ApiBinanceCandle[]>(`/market/binance/klines?${params.toString()}`, {
+    headers: {},
+  });
+  return candles.map(fromBinanceCandle);
 }
 
 export async function calculateIndicators(
@@ -87,6 +105,22 @@ function fromApiCandle(candle: ApiCandle): Candle {
   };
 }
 
+function fromBinanceCandle(candle: ApiBinanceCandle): Candle {
+  const timestamp =
+    typeof candle.time === 'number'
+      ? new Date(candle.time * 1000).toISOString()
+      : String(candle.time);
+  return {
+    date: timestamp,
+    timestamp,
+    open: candle.open,
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+    volume: candle.volume,
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -97,9 +131,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const message = await readErrorMessage(response);
     throw new Error(message || `API request failed with status ${response.status}.`);
   }
 
   return response.json() as Promise<T>;
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const text = await response.text();
+  if (!text) return '';
+  try {
+    const body = JSON.parse(text) as { detail?: unknown };
+    if (typeof body.detail === 'string') return body.detail;
+    if (Array.isArray(body.detail)) {
+      return body.detail
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (item && typeof item === 'object' && 'msg' in item) {
+            return String((item as { msg: unknown }).msg);
+          }
+          return String(item);
+        })
+        .join(' ');
+    }
+  } catch {
+    return text;
+  }
+  return text;
 }

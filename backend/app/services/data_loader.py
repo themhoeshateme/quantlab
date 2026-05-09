@@ -1,12 +1,23 @@
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import UploadFile
+import pandas as pd
 from pydantic import ValidationError
 
 from app.models import Candle
 
 REQUIRED_COLUMNS = {"open", "high", "low", "close", "volume"}
-TIME_COLUMNS = ("timestamp", "date")
+TIME_COLUMNS = {
+    "timestamp",
+    "date",
+    "datetime",
+    "date_time",
+    "date/time",
+    "time",
+    "open_time",
+    "open time",
+}
 SAMPLE_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "sample_btc_usd.csv"
 
 
@@ -15,14 +26,19 @@ def load_sample_candles() -> list[Candle]:
 
 
 async def parse_upload_file(file: UploadFile) -> list[Candle]:
+    filename = (file.filename or "").lower()
     content = await file.read()
     if not content:
-        raise ValueError("CSV file is empty.")
-    try:
-        text = content.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise ValueError("CSV file must be UTF-8 encoded.") from exc
-    return parse_ohlcv_csv(text)
+        raise ValueError("Uploaded file is empty.")
+
+    if filename.endswith(".csv"):
+        dataframe = pd.read_csv(BytesIO(content))
+    elif filename.endswith(".xlsx"):
+        dataframe = pd.read_excel(BytesIO(content))
+    else:
+        raise ValueError("Only .csv and .xlsx files are supported.")
+
+    return parse_ohlcv_dataframe(dataframe)
 
 
 def parse_ohlcv_csv(csv_text: str) -> list[Candle]:
@@ -63,3 +79,40 @@ def parse_ohlcv_csv(csv_text: str) -> list[Candle]:
             raise ValueError(f"Row {row_number} contains invalid OHLCV data.") from exc
 
     return candles
+
+
+def parse_ohlcv_dataframe(dataframe: pd.DataFrame) -> list[Candle]:
+    if dataframe.empty:
+        raise ValueError("Uploaded file must include at least one candle row.")
+
+    lowered_columns = {normalize_column(column): str(column) for column in dataframe.columns}
+    time_column = next((column for column in TIME_COLUMNS if column in lowered_columns), None)
+    missing = sorted(REQUIRED_COLUMNS - set(lowered_columns.keys()))
+    if time_column is None:
+        missing.insert(0, "timestamp/date/datetime/time")
+    if missing:
+        raise ValueError(f"Missing required columns: {', '.join(missing)}.")
+
+    candles: list[Candle] = []
+    for row_index, row in dataframe.iterrows():
+        row_number = row_index + 2
+        try:
+            timestamp_raw = row[lowered_columns[time_column]]
+            candles.append(
+                Candle(
+                    timestamp=str(timestamp_raw),
+                    open=float(row[lowered_columns["open"]]),
+                    high=float(row[lowered_columns["high"]]),
+                    low=float(row[lowered_columns["low"]]),
+                    close=float(row[lowered_columns["close"]]),
+                    volume=float(row[lowered_columns["volume"]]),
+                )
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise ValueError(f"Row {row_number} contains invalid OHLCV data.") from exc
+
+    return candles
+
+
+def normalize_column(column: object) -> str:
+    return str(column).strip().lower().replace("-", "_")

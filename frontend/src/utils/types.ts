@@ -26,11 +26,33 @@ export interface BacktestResult {
   maxDrawdown: number;
   finalEquity: number;
   trades: Trade[];
-  equityCurve: number[];
+  equityCurve: EquityPoint[];
+}
+
+export interface BacktestSignal {
+  timestamp?: string;
+  time: string;
+  type: 'buy' | 'sell';
+  price: number;
+  reason: string;
+}
+
+export interface EquityPoint {
+  time: string;
+  value: number;
 }
 
 export interface ApiCandle {
   timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface ApiBinanceCandle {
+  time: number | string;
   open: number;
   high: number;
   low: number;
@@ -47,6 +69,14 @@ export interface ApiBacktestResponse {
     total_trades: number;
     win_rate: number;
     max_drawdown: number;
+    sharpe_ratio?: number;
+  };
+  stats?: {
+    total_trades: number;
+    net_profit: number;
+    win_rate: number;
+    max_drawdown: number;
+    sharpe_ratio: number;
   };
   trades: Array<{
     entry_time: string;
@@ -57,10 +87,6 @@ export interface ApiBacktestResponse {
     profit: number;
     profit_pct: number;
   }>;
-  signals: Array<{
-    timestamp: string;
-    type: 'buy' | 'sell';
-    price: number;
-  }>;
-  equity_curve: number[];
+  signals: BacktestSignal[];
+  equity_curve: Array<number | EquityPoint>;
 }

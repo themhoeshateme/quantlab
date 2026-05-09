@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   calculateIndicators,
+  fetchBinanceKlines,
   getHealth,
   getSampleData,
   runMaCrossoverBacktest,
-  uploadCsv,
+  uploadData,
 } from './api/client';
-import { CandleChart } from './components/CandleChart';
+import { CandleChart, ChartType } from './components/CandleChart';
 import { DataLoader } from './components/DataLoader';
 import sampleCandles from './data/sample-ohlcv.json';
 import { runMovingAverageCrossoverBacktest } from './backtest/movingAverageCrossover';
@@ -38,6 +39,7 @@ interface HistoryEntry {
 const defaultCandles = sampleCandles as Candle[];
 const navItems: Section[] = ['Terminal', 'Strategies', 'Portfolio', 'Backtests', 'History'];
 const historyKey = 'quantlab.backtestHistory';
+const defaultLiveRange = getRecentDateRange(7);
 
 function App() {
   const [section, setSection] = useState<Section>(() => readSectionFromHash());
@@ -48,6 +50,17 @@ function App() {
   const [initialCash, setInitialCash] = useState(10_000);
   const [feeRate, setFeeRate] = useState(0.001);
   const [timeframe] = useState('15m');
+  const [backtestStartDate, setBacktestStartDate] = useState('');
+  const [backtestEndDate, setBacktestEndDate] = useState('');
+  const [binanceSymbol, setBinanceSymbol] = useState('BTCUSDT');
+  const [binanceInterval, setBinanceInterval] = useState('15m');
+  const [binanceStartDate, setBinanceStartDate] = useState(defaultLiveRange.startDate);
+  const [binanceEndDate, setBinanceEndDate] = useState(defaultLiveRange.endDate);
+  const [chartAction, setChartAction] = useState<'zoom-in' | 'zoom-out' | 'fit' | null>(null);
+  const [chartType, setChartType] = useState<ChartType>('candlestick');
+  const [showSignals, setShowSignals] = useState(true);
+  const [showSma, setShowSma] = useState(true);
+  const [showVolume, setShowVolume] = useState(true);
   const [apiStatus, setApiStatus] = useState<ApiStatus>('checking');
   const [statusMessage, setStatusMessage] = useState('Checking backend health...');
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +84,12 @@ function App() {
   const [apiBacktest, setApiBacktest] = useState<ApiBacktestResponse | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>(() => readHistory());
 
-  const closes = useMemo(() => candles.map((candle) => candle.close), [candles]);
-  const strategyError = validateStrategy(shortWindow, longWindow, candles.length);
+  const filteredCandles = useMemo(
+    () => filterCandlesByDateRange(candles, backtestStartDate, backtestEndDate),
+    [backtestEndDate, backtestStartDate, candles],
+  );
+  const closes = useMemo(() => filteredCandles.map((candle) => candle.close), [filteredCandles]);
+  const strategyError = validateStrategy(shortWindow, longWindow, filteredCandles.length);
   const fallbackSmaShort = useMemo(
     () => calculateSma(closes, Math.max(shortWindow, 2)),
     [closes, shortWindow],
@@ -88,12 +105,12 @@ function App() {
     () =>
       strategyError
         ? emptyBacktest()
-        : runMovingAverageCrossoverBacktest(candles, {
+        : runMovingAverageCrossoverBacktest(filteredCandles, {
             shortPeriod: shortWindow,
             longPeriod: longWindow,
             initialCash,
           }),
-    [candles, initialCash, longWindow, shortWindow, strategyError],
+    [filteredCandles, initialCash, longWindow, shortWindow, strategyError],
   );
   const smaShort = apiIndicators?.smaShort ?? fallbackSmaShort;
   const smaLong = apiIndicators?.smaLong ?? fallbackSmaLong;
@@ -104,14 +121,14 @@ function App() {
     () => (apiBacktest ? fromApiBacktest(apiBacktest) : fallbackBacktest),
     [apiBacktest, fallbackBacktest],
   );
-  const latestIndex = candles.length - 1;
-  const latestCandle = candles[latestIndex];
+  const latestIndex = filteredCandles.length - 1;
+  const latestCandle = filteredCandles[latestIndex];
   const latestBand = bands[latestIndex];
   const latestSignal = getLatestSignal(apiBacktest, backtest);
 
   useEffect(() => {
     checkHealth();
-    loadSampleData();
+    loadLiveBinanceData();
   }, []);
 
   useEffect(() => {
@@ -121,7 +138,7 @@ function App() {
   useEffect(() => {
     refreshIndicators();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, shortWindow, longWindow]);
+  }, [filteredCandles, shortWindow, longWindow]);
 
   async function checkHealth() {
     try {
@@ -142,14 +159,40 @@ function App() {
       setCandles(apiCandles);
       setDataSource('FastAPI sample BTC-USD candles');
       setApiBacktest(null);
+      setApiIndicators(null);
       setApiStatus('connected');
       setStatusMessage('Sample data loaded from API.');
     } catch {
       setCandles(defaultCandles);
       setDataSource('Bundled fallback sample data');
       setApiBacktest(null);
+      setApiIndicators(null);
       setApiStatus('fallback');
       setStatusMessage('Backend unavailable. Loaded bundled fallback sample data.');
+    } finally {
+      setIsLoadingSample(false);
+    }
+  }
+
+  async function loadLiveBinanceData() {
+    setIsLoadingSample(true);
+    setError(null);
+    try {
+      const nextCandles = await fetchBinanceKlines({
+        symbol: binanceSymbol.trim().toUpperCase(),
+        interval: binanceInterval,
+        startDate: binanceStartDate,
+        endDate: binanceEndDate,
+      });
+      setCandles(nextCandles);
+      setDataSource(`Live Binance ${binanceSymbol.toUpperCase()} ${binanceInterval}`);
+      setApiBacktest(null);
+      setApiIndicators(null);
+      setApiStatus('connected');
+      setStatusMessage(`Loaded ${nextCandles.length} live Binance candles.`);
+    } catch {
+      await loadSampleData();
+      setStatusMessage('Live Binance fetch failed. Loaded bundled fallback sample data.');
     } finally {
       setIsLoadingSample(false);
     }
@@ -158,16 +201,20 @@ function App() {
   async function handleUpload(file: File) {
     setError(null);
     try {
-      const uploaded = await uploadCsv(file);
+      const uploaded = await uploadData(file);
+      if (uploaded.length === 0) {
+        throw new Error('Uploaded file did not contain any valid candles.');
+      }
       setCandles(uploaded);
       setDataSource(file.name);
       setApiBacktest(null);
+      setApiIndicators(null);
       setStatusMessage(`Loaded ${uploaded.length} candles from ${file.name}.`);
       setApiStatus('connected');
     } catch (uploadError) {
       const message = parseError(
         uploadError,
-        'Invalid CSV. Required columns: timestamp/date, open, high, low, close, volume.',
+        'Invalid file. Required columns: timestamp/date/time, open, high, low, close, volume.',
       );
       setError(message);
     }
@@ -176,7 +223,7 @@ function App() {
   async function refreshIndicators() {
     if (strategyError) return;
     try {
-      const response = await calculateIndicators(candles, {
+      const response = await calculateIndicators(filteredCandles, {
         sma: [shortWindow, longWindow],
         ema: [10],
         rsi: 14,
@@ -203,7 +250,7 @@ function App() {
     setStatusMessage('Running backtest...');
     try {
       const result = await runMaCrossoverBacktest({
-        candles,
+        candles: filteredCandles,
         shortWindow,
         longWindow,
         initialCash,
@@ -223,6 +270,30 @@ function App() {
       setStatusMessage('Backtest failed.');
     } finally {
       setIsRunningBacktest(false);
+    }
+  }
+
+  async function handleFetchBinance() {
+    setError(null);
+    if (!binanceStartDate || !binanceEndDate) {
+      setError('Select Binance start and end dates.');
+      return;
+    }
+    try {
+      const nextCandles = await fetchBinanceKlines({
+        symbol: binanceSymbol.trim().toUpperCase(),
+        interval: binanceInterval,
+        startDate: binanceStartDate,
+        endDate: binanceEndDate,
+      });
+      setCandles(nextCandles);
+      setDataSource(`Live Binance ${binanceSymbol.toUpperCase()} ${binanceInterval}`);
+      setApiBacktest(null);
+      setApiIndicators(null);
+      setStatusMessage(`Loaded ${nextCandles.length} candles from Binance.`);
+      setApiStatus('connected');
+    } catch (fetchError) {
+      setError(parseError(fetchError, 'Failed to fetch Binance candles.'));
     }
   }
 
@@ -484,12 +555,16 @@ function App() {
               ) : null}
             </div>
             <CandleChart
-              candles={candles}
+              candles={filteredCandles}
               shortSma={smaShort}
               longSma={smaLong}
-              trades={backtest.trades}
-              showShortSma={visibleIndicators.smaShort}
-              showLongSma={visibleIndicators.smaLong}
+              signals={apiBacktest?.signals ?? []}
+              chartType={chartType}
+              showSignals={showSignals}
+              showSma={showSma && (visibleIndicators.smaShort || visibleIndicators.smaLong)}
+              showVolume={showVolume}
+              chartAction={chartAction}
+              onChartActionHandled={() => setChartAction(null)}
             />
           </section>
           <aside className="right-rail">
@@ -543,6 +618,24 @@ function App() {
             />
           </label>
         </div>
+        <div className="execution-grid">
+          <label>
+            <span>Backtest start date</span>
+            <input
+              type="date"
+              value={backtestStartDate}
+              onChange={(event) => setBacktestStartDate(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Backtest end date</span>
+            <input
+              type="date"
+              value={backtestEndDate}
+              onChange={(event) => setBacktestEndDate(event.target.value)}
+            />
+          </label>
+        </div>
         <label className="field">
           <span>Short window</span>
           <input
@@ -575,6 +668,104 @@ function App() {
           <strong>{latestSignal}</strong>
           <small>{statusMessage}</small>
         </div>
+        <div className="button-row">
+          <button type="button" onClick={() => setChartAction('zoom-in')}>
+            Zoom In
+          </button>
+          <button type="button" onClick={() => setChartAction('zoom-out')}>
+            Zoom Out
+          </button>
+          <button type="button" className="secondary" onClick={() => setChartAction('fit')}>
+            Reset View
+          </button>
+        </div>
+        <div className="control-group">
+          <span>Chart Type</span>
+          <div className="segmented-control">
+            <button
+              type="button"
+              className={chartType === 'candlestick' ? 'active' : undefined}
+              onClick={() => setChartType('candlestick')}
+            >
+              Candlestick
+            </button>
+            <button
+              type="button"
+              className={chartType === 'bar' ? 'active' : undefined}
+              onClick={() => setChartType('bar')}
+            >
+              Bar
+            </button>
+          </div>
+        </div>
+        <div className="toggle-stack">
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={showSignals}
+              onChange={() => setShowSignals((current) => !current)}
+            />
+            Show Signals
+          </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={showSma}
+              onChange={() => setShowSma((current) => !current)}
+            />
+            Show SMA
+          </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={showVolume}
+              onChange={() => setShowVolume((current) => !current)}
+            />
+            Show Volume
+          </label>
+        </div>
+        <div className="execution-grid">
+          <label>
+            <span>Binance symbol</span>
+            <input
+              type="text"
+              value={binanceSymbol}
+              onChange={(event) => setBinanceSymbol(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Binance interval</span>
+            <select
+              value={binanceInterval}
+              onChange={(event) => setBinanceInterval(event.target.value)}
+            >
+              {['1m', '5m', '15m', '1h', '4h', '1d'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Binance start date</span>
+            <input
+              type="date"
+              value={binanceStartDate}
+              onChange={(event) => setBinanceStartDate(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Binance end date</span>
+            <input
+              type="date"
+              value={binanceEndDate}
+              onChange={(event) => setBinanceEndDate(event.target.value)}
+            />
+          </label>
+        </div>
+        <button className="ghost-button" type="button" onClick={handleFetchBinance}>
+          Fetch Binance Candles
+        </button>
       </section>
     );
   }
@@ -601,7 +792,11 @@ function App() {
             value={`${backtest.maxDrawdown.toFixed(2)}%`}
             tone="negative"
           />
-          <Metric label="Sharpe ratio" value="Not implemented" tone="muted-strong" />
+          <Metric
+            label="Sharpe ratio"
+            value={formatCompact(apiBacktest?.stats?.sharpe_ratio ?? apiBacktest?.summary.sharpe_ratio ?? 0)}
+            tone="muted-strong"
+          />
         </section>
         <section className="terminal-panel trade-preview">
           <PanelHeading eyebrow="Signals" title="Trade log" />
@@ -731,13 +926,13 @@ function IndicatorPill({
   tone,
 }: {
   label: string;
-  value: number | null;
+  value: number | null | undefined;
   tone: 'green' | 'purple' | 'blue' | 'neutral';
 }) {
   return (
     <span className={`indicator-pill ${tone}`}>
       {label}
-      <strong>{value === null ? 'Pending' : formatCompact(value)}</strong>
+      <strong>{typeof value === 'number' ? formatCompact(value) : 'Pending'}</strong>
     </span>
   );
 }
@@ -819,7 +1014,9 @@ function fromApiBacktest(response: ApiBacktestResponse): BacktestResult {
       profit: trade.profit,
       returnPct: trade.profit_pct,
     })),
-    equityCurve: response.equity_curve,
+    equityCurve: response.equity_curve.map((point, index) =>
+      typeof point === 'number' ? { time: String(index), value: point } : point,
+    ),
   };
 }
 
@@ -846,6 +1043,20 @@ function readHistory(): HistoryEntry[] {
   }
 }
 
+function getRecentDateRange(daysBack: number): { startDate: string; endDate: string } {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(end.getDate() - daysBack);
+  return {
+    startDate: toDateInputValue(start),
+    endDate: toDateInputValue(end),
+  };
+}
+
+function toDateInputValue(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 function readSectionFromHash(): Section {
   const hash = window.location.hash.replace('#', '').toLowerCase();
   const match = navItems.find((item) => item.toLowerCase() === hash);
@@ -869,6 +1080,19 @@ function readBands(value: unknown): Array<BollingerBandPoint | null> {
       ? null
       : { middle: middleValue, upper: upper[index] as number, lower: lower[index] as number },
   );
+}
+
+function filterCandlesByDateRange(candles: Candle[], startDate: string, endDate: string): Candle[] {
+  if (!startDate && !endDate) return candles;
+  const start = startDate ? Date.parse(startDate) : Number.NEGATIVE_INFINITY;
+  const end = endDate
+    ? Date.parse(`${endDate}T23:59:59.999Z`)
+    : Number.POSITIVE_INFINITY;
+  return candles.filter((candle) => {
+    const candleTime = Date.parse(candle.timestamp ?? candle.date);
+    if (Number.isNaN(candleTime)) return false;
+    return candleTime >= start && candleTime <= end;
+  });
 }
 
 function validateStrategy(
@@ -904,7 +1128,7 @@ function getLatestSignal(
 }
 
 function parseError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message.replace(/[{}"]/g, '') : fallback;
+  return error instanceof Error ? error.message : fallback;
 }
 
 function downloadCsv(filename: string, header: string[], rows: string[]) {
@@ -919,6 +1143,7 @@ function downloadCsv(filename: string, header: string[], rows: string[]) {
 }
 
 function formatCompact(value: number): string {
+  if (!Number.isFinite(value)) return 'Pending';
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 

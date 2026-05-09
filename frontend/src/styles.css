@@ -480,9 +480,120 @@ select:focus {
 .chart-wrap {
   width: 100%;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(165, 162, 255, 0.04), transparent 38%), #060a14;
+  background: #080b12;
+  box-shadow:
+    0 22px 58px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.chart-stage {
+  position: relative;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    #0b0f18;
+  padding: 8px 12px;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+
+.chart-symbol {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 0 10px;
+  color: #e2e8f0;
+  font-weight: 800;
+}
+
+.search-dot {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #94a3b8;
+  border-radius: 999px;
+  box-shadow: 4px 4px 0 -3px #94a3b8;
+}
+
+.chart-timeframes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.chart-timeframes span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 28px;
+  border-radius: 5px;
+  color: #8b96a8;
+  font-weight: 700;
+}
+
+.chart-timeframes span.active {
+  background: rgba(148, 163, 184, 0.13);
+  color: #f8fafc;
+}
+
+.chart-tool-spacer {
+  flex: 1;
+}
+
+.chart-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.78);
+  padding: 0 12px;
+  color: #e2e8f0;
+  font-weight: 800;
+}
+
+.lw-chart {
+  width: 100%;
+  height: 540px;
+  background: #080b12;
+}
+
+.chart-hover-card {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 6px;
+  background: rgba(8, 11, 18, 0.76);
+  color: #94a3b8;
+  padding: 6px 8px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.72rem;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.chart-hover-card strong {
+  color: #e2e8f0;
+  font-weight: 800;
 }
 
 svg {
@@ -739,6 +850,50 @@ svg {
 .button-row button.secondary {
   background: rgba(255, 255, 255, 0.045);
   color: var(--muted);
+}
+
+.control-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.control-group > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(7, 10, 18, 0.5);
+  padding: 4px;
+}
+
+.segmented-control button {
+  min-height: 34px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  border-color: rgba(165, 162, 255, 0.22);
+  background: rgba(165, 162, 255, 0.14);
+  color: var(--text);
+}
+
+.toggle-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: rgba(7, 10, 18, 0.42);
+  padding: 10px;
 }
 
 .status-text {

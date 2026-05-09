@@ -1,5 +1,15 @@
 # QuantLab
 
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=111827)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Binance API](https://img.shields.io/badge/Binance%20API-Klines-F0B90B?logo=binance&logoColor=111827)](https://developers.binance.com/)
+[![Lightweight Charts](https://img.shields.io/badge/Lightweight%20Charts-5-2962FF)](https://tradingview.github.io/lightweight-charts/)
+[![Tests](https://img.shields.io/badge/tests-passing-16a34a)](#testing)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 QuantLab is an open-source GUI-based quantitative backtesting foundation for OHLCV market data, technical indicators, simple strategies, and beginner-friendly contribution.
 
 This repository is intentionally scoped as an initial MVP for contributors. Does not include authentication, databases, brokerage integrations, payments, AI agents, or live trading execution.

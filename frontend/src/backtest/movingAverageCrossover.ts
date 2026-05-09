@@ -1,5 +1,5 @@
 import { calculateSma, round } from '../indicators';
-import { BacktestResult, Candle, Trade } from '../utils/types';
+import { BacktestResult, Candle, EquityPoint, Trade } from '../utils/types';
 
 interface MovingAverageCrossoverOptions {
   shortPeriod: number;
@@ -19,7 +19,7 @@ export function runMovingAverageCrossoverBacktest(
   const shortSma = calculateSma(closes, options.shortPeriod);
   const longSma = calculateSma(closes, options.longPeriod);
   const trades: Trade[] = [];
-  const equityCurve: number[] = [];
+  const equityCurve: EquityPoint[] = [];
   let cash = options.initialCash;
   let units = 0;
   let entryPrice = 0;
@@ -59,7 +59,10 @@ export function runMovingAverageCrossoverBacktest(
     peakEquity = Math.max(peakEquity, equity);
     const drawdown = peakEquity === 0 ? 0 : (peakEquity - equity) / peakEquity;
     maxDrawdown = Math.max(maxDrawdown, drawdown);
-    equityCurve.push(round(equity, 2));
+    equityCurve.push({
+      time: candles[index].timestamp ?? candles[index].date,
+      value: round(equity, 2),
+    });
   }
 
   if (units > 0 && candles.length > 0) {
