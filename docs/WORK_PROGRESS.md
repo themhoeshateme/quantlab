@@ -50,7 +50,7 @@ Implemented with minimal scoped changes:
   - Normalizes output candles as:
     - `time`, `open`, `high`, `low`, `close`, `volume`
 - Added backend upload endpoint:
-  - `POST /data/upload` via multipart/form-data
+  - `POST /api/data/upload` via multipart/form-data
   - Accepts only `.csv` and `.xlsx`
   - Parses with `pandas.read_csv` and `pandas.read_excel`
   - Validates required OHLCV columns (`timestamp/date/time`, `open`, `high`, `low`, `close`, `volume`)

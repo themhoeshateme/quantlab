@@ -25,6 +25,14 @@ async def upload_csv(file: Annotated[UploadFile, File()]) -> list[Candle]:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.post("/api/data/upload", response_model=list[Candle])
+async def upload_api_data(file: Annotated[UploadFile, File()]) -> list[Candle]:
+    try:
+        return await parse_upload_file(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/data/upload", response_model=list[Candle])
 async def upload_data(file: Annotated[UploadFile, File()]) -> list[Candle]:
     try:

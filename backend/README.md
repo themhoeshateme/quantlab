@@ -31,7 +31,7 @@ The API runs at `http://localhost:8000` by default.
 - `GET /health`
 - `GET /api/sample-data`
 - `POST /api/upload-csv`
-- `POST /data/upload`
+- `POST /api/data/upload`
 - `GET /market/binance/klines`
 - `POST /api/indicators`
 - `POST /api/backtest/ma-crossover`

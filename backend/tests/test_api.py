@@ -64,7 +64,7 @@ def test_backtest_endpoint() -> None:
 
 def test_csv_upload_endpoint_accepts_ohlcv_file() -> None:
     response = client.post(
-        "/data/upload",
+        "/api/data/upload",
         files={
             "file": (
                 "good.csv",
@@ -77,6 +77,49 @@ def test_csv_upload_endpoint_accepts_ohlcv_file() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data[0]["timestamp"] == "2024-01-01"
+    assert data[0]["close"] == 11
+
+
+def test_csv_upload_accepts_common_export_aliases_and_formatted_numbers() -> None:
+    response = client.post(
+        "/api/data/upload",
+        files={
+            "file": (
+                "broker-export.csv",
+                "\n".join(
+                    [
+                        "Open Time,Open Price,High Price,Low Price,Last Price,Vol",
+                        '2024-01-01,"$1,000.50","$1,020.75","$990.25","$1,010.00","12,345"',
+                    ]
+                ),
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["timestamp"] == "2024-01-01"
+    assert data[0]["open"] == 1000.5
+    assert data[0]["close"] == 1010
+    assert data[0]["volume"] == 12345
+
+
+def test_csv_upload_accepts_semicolon_separated_files() -> None:
+    response = client.post(
+        "/api/data/upload",
+        files={
+            "file": (
+                "semicolon.csv",
+                "datetime;open;high;low;close;volume\n2024-01-01 12:00:00;10;12;9;11;100",
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["timestamp"] == "2024-01-01 12:00:00"
     assert data[0]["close"] == 11
 
 
@@ -97,7 +140,7 @@ def test_xlsx_upload_endpoint_accepts_ohlcv_file() -> None:
     buffer.seek(0)
 
     response = client.post(
-        "/data/upload",
+        "/api/data/upload",
         files={
             "file": (
                 "good.xlsx",
@@ -124,7 +167,7 @@ def test_invalid_csv_upload_returns_clear_400() -> None:
 
 def test_upload_endpoint_rejects_unsupported_type() -> None:
     response = client.post(
-        "/data/upload",
+        "/api/data/upload",
         files={"file": ("bad.json", '{"a":1}', "application/json")},
     )
 

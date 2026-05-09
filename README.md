@@ -136,7 +136,7 @@ The backend runs at `http://localhost:8000`. The frontend reads `VITE_API_URL`, 
 - `GET /health` returns backend service status.
 - `GET /api/sample-data` returns bundled OHLCV candles.
 - `POST /api/upload-csv` validates and normalizes OHLCV CSV uploads.
-- `POST /data/upload` validates and normalizes OHLCV CSV/XLSX uploads.
+- `POST /api/data/upload` validates and normalizes OHLCV CSV/XLSX uploads.
 - `GET /market/binance/klines` fetches Binance public OHLCV candles.
 - `POST /api/indicators` calculates SMA, EMA, RSI, and Bollinger Bands.
 - `POST /api/backtest/ma-crossover` runs the moving-average crossover backtest.

@@ -164,7 +164,7 @@ async function mockFetch(input: RequestInfo | URL) {
   }
   if (url.endsWith('/api/backtest/ma-crossover')) return json(backtestResponse);
   if (url.includes('/market/binance/klines')) return json(candles);
-  if (url.endsWith('/data/upload')) {
+  if (url.endsWith('/api/data/upload')) {
     if (invalidUpload) {
       return new Response(JSON.stringify({ detail: 'Missing required columns: high, low.' }), {
         status: 400,

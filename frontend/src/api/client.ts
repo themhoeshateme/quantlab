@@ -18,7 +18,7 @@ export async function getSampleData(): Promise<Candle[]> {
 export async function uploadData(file: File): Promise<Candle[]> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetch(`${API_URL}/data/upload`, {
+  const response = await fetch(`${API_URL}/api/data/upload`, {
     method: 'POST',
     body: formData,
   });
